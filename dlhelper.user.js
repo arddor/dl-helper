@@ -83,18 +83,42 @@
           url = await getOneDriveDirectLink();
         }
 
+        const jd = new MyJDownloader(JD_USER, JD_PASS);
+
+        const attemptAddLinks = async (forceAuth = false) => {
+          try {
+            // Only authenticate if forced or no auth data exists
+            if (forceAuth || !jd.authData) {
+              await jd.authenticate();
+              console.log("✅ Successfully logged into MyJDownloader.");
+            }
+
+            const devices = await jd.getDevices();
+            const device = devices[0];
+            console.log("✅ Found Device:", device);
+
+            await jd.addLinks(device.id, [url]);
+            console.log("✅ Link added to JDownloader successfully!", url);
+          } catch (err) {
+            // If this is our first attempt and we get an auth error, try re-authenticating
+            if (
+              !forceAuth &&
+              (err.message.includes("401") ||
+                err.message.includes("authentication") ||
+                err.message.includes("unauthorized") ||
+                err.message.includes("Session token missing"))
+            ) {
+              console.log(
+                "🔄 Authentication error detected, retrying with fresh authentication..."
+              );
+              return attemptAddLinks(true);
+            }
+            throw err;
+          }
+        };
+
         try {
-          const jd = new MyJDownloader(JD_USER, JD_PASS);
-
-          await jd.authenticate();
-          console.log("✅ Successfully logged into MyJDownloader.");
-
-          const devices = await jd.getDevices();
-          const device = devices[0];
-          console.log("✅ Found Device:", device);
-
-          await jd.addLinks(device.id, [url]);
-          console.log("✅ Link added to JDownloader successfully!", url);
+          await attemptAddLinks();
         } catch (err) {
           console.error("❌ Error sending link to JDownloader:", err);
           throw err;
